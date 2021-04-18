@@ -1,9 +1,11 @@
-import { gmail_v1 as gmail, Auth, google } from "googleapis";
+import * as fs from "fs";
+import * as fsp from "fs/promises";
+import { Auth, gmail_v1 as gmail, google } from "googleapis";
 import MailComposer from "nodemailer/lib/mail-composer";
-import * as fs from "fs/promises";
-import { EZGmailValueError } from "./types";
-import type { SendArgs } from "./types";
+import path from "path";
 import { GmailMessage } from "./GmailMessage";
+import type { SendArgs } from "./types";
+import { EZGmailError, EZGmailValueError } from "./types";
 
 export class GmailClient {
   gmailService: gmail.Gmail;
@@ -16,10 +18,10 @@ export class GmailClient {
     userId = "me"
   ): Promise<GmailClient> {
     const credentials = JSON.parse(
-      await fs.readFile(credentialsFile, { encoding: "utf-8" })
+      await fsp.readFile(credentialsFile, { encoding: "utf-8" })
     );
     const token = JSON.parse(
-      await fs.readFile(tokenFile, { encoding: "utf-8" })
+      await fsp.readFile(tokenFile, { encoding: "utf-8" })
     ) as Auth.Credentials;
 
     const { client_secret, client_id, redirect_uris } = credentials.installed;
@@ -49,6 +51,7 @@ export class GmailClient {
       body,
       cc,
       bcc,
+      attachments,
       mimeSubtype = "plain",
       _threadId,
     } = sendArgs;
@@ -58,7 +61,21 @@ export class GmailClient {
         "Wrong string passed for mimeSubtype, must be 'plain' or 'html'"
       );
     }
+    const attachmentData: [name: string, content: Buffer][] = [];
+
     try {
+      if (attachments != null || attachments.length !== 0) {
+        for (const attachment of attachments) {
+          if (!fs.existsSync(attachment)) {
+            throw new EZGmailError(
+              `File ${path.resolve(attachment)} does not exist!`
+            );
+          }
+          const fileBuffer = await fsp.readFile(attachment);
+          attachmentData.push([attachment, fileBuffer]);
+        }
+      }
+
       const messageStream = await new MailComposer({
         to: recipient,
         from: sender,
@@ -67,15 +84,22 @@ export class GmailClient {
         bcc: bcc,
         text: mimeSubtype === "plain" ? body : undefined,
         html: mimeSubtype === "html" ? body : undefined,
+        attachments:
+          attachmentData.length === 0
+            ? undefined
+            : attachmentData.map(([filename, content]) => ({
+                content,
+                filename,
+              })),
       })
         .compile()
         .build();
       const message = messageStream.toString("base64"); // The raw message should be in base64 format
-      const rawMessage = new GmailMessage({
+      const gmailMessage = new GmailMessage({
         raw: message,
         threadId: _threadId,
       });
-      return rawMessage;
+      return gmailMessage;
     } catch (e) {
       console.error(e); // This is useless lol
     }
