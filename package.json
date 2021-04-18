@@ -1,0 +1,33 @@
+{
+  "name": "node-ezgmail",
+  "version": "0.0.1",
+  "description": "A simpler Node.js interface to the Gmail API",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Info: No tests yet\" && exit 0",
+    "build": "tsc",
+    "lint": "tsc --noEmit",
+    "prepare": "npm run build",
+    "prepublishOnly": "npm test && npm run lint",
+    "preversion": "npm run lint"
+  },
+  "keywords": [
+    "gmail",
+    "ezgmail",
+    "googleapis"
+  ],
+  "author": "Tamim Arafat <arafat.tamim@yahoo.com>",
+  "license": "GPLV3",
+  "files": [
+    "dist/**/*"
+  ],
+  "dependencies": {
+    "googleapis": "^71.0.0",
+    "nodemailer": "^6.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "^14.14.41",
+    "@types/nodemailer": "^6.4.1",
+    "typescript": "^4.2.4"
+  }
+}
