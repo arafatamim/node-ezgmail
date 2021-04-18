@@ -156,7 +156,7 @@ export class GmailMessage {
       );
     }
 
-    const attachmentObj = await gmailClient.serviceGmail.users.messages.attachments.get(
+    const attachmentObj = await gmailClient.gmailService.users.messages.attachments.get(
       {
         id: this._attachmentsInfo[attachmentIndex].id,
         messageId: this.id,
@@ -180,7 +180,57 @@ export class GmailMessage {
     );
   }
 
-  // TODO: ...implement other functions
+  /** Download all attachments in this message */
+  async downloadAllAttachments(
+    gmailClient: GmailClient,
+    /** A relative or absolute path to the download directory. */
+    downloadFolder = ".",
+    /** If `false`, existing local files will not be overridden by attachments of the same filename
+     * @default true */
+    overwrite = true
+  ) {
+    if (!overwrite) {
+      const attachmentFilenames = this._attachmentsInfo.map((v) => v.fileName);
+      if (
+        attachmentFilenames.length !== [...new Set(attachmentFilenames)].length
+      ) {
+        throw new EZGmailError(
+          "There are duplicate filenames in attachments. Pass overwrite=true to download them anyway."
+        );
+      }
+    }
+
+    const downloadedAttachmentFilenames: string[] = [];
+
+    if (!fs.existsSync(downloadFolder)) {
+      fs.mkdirSync(downloadFolder);
+    } else if (fs.lstatSync(downloadFolder).isFile()) {
+      throw new EZGmailError(`${downloadFolder} is a file, not a folder`);
+    }
+
+    for (const attachmentInfo of this._attachmentsInfo) {
+      const attachmentObj = await gmailClient.gmailService.users.messages.attachments.get(
+        {
+          id: attachmentInfo.id,
+          messageId: this.id,
+          userId: "me",
+        }
+      );
+      const attachmentData = Buffer.from(
+        attachmentObj.data.data,
+        "base64"
+      ).toString("utf-8");
+      const downloadFilename = attachmentInfo.fileName; // TODO handle files with duplicate filenames in the future
+
+      await fs.promises.writeFile(
+        path.join(downloadFolder, downloadFilename),
+        attachmentData
+      );
+
+      downloadedAttachmentFilenames.push(downloadFilename);
+      return downloadedAttachmentFilenames;
+    }
+  }
 
   /** Like the `send()` function, but replies to the last message in this thread */
   reply(gmailClient: GmailClient, replyArgs: ReplyArgs) {

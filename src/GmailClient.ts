@@ -1,11 +1,12 @@
 import { gmail_v1 as gmail, Auth, google } from "googleapis";
 import MailComposer from "nodemailer/lib/mail-composer";
 import * as fs from "fs/promises";
-import { EZGmailValueError, MimeSubtype, SendArgs } from "./types";
+import { EZGmailValueError } from "./types";
+import type { SendArgs } from "./types";
 import { GmailMessage } from "./GmailMessage";
 
 export class GmailClient {
-  serviceGmail: gmail.Gmail;
+  gmailService: gmail.Gmail;
   emailAddress: string;
   loggedIn: boolean;
 
@@ -32,7 +33,7 @@ export class GmailClient {
 
     const serviceGmail = google.gmail({ auth: oAuth2Client, version: "v1" });
 
-    this.serviceGmail = serviceGmail;
+    this.gmailService = serviceGmail;
     return serviceGmail.users.getProfile({ userId }).then((res) => {
       this.emailAddress = res.data.emailAddress;
       this.loggedIn = res.data.emailAddress != null;
@@ -81,7 +82,7 @@ export class GmailClient {
   }
 
   private async _sendMessage(message: GmailMessage, userId = "me") {
-    const sentResponse = await this.serviceGmail.users.messages.send({
+    const sentResponse = await this.gmailService.users.messages.send({
       userId,
       requestBody: message.messageObj,
     });
@@ -89,7 +90,7 @@ export class GmailClient {
   }
 
   async send(sendArgs: SendArgs, userId = "me"): Promise<void> {
-    if (this.serviceGmail == null)
+    if (this.gmailService == null)
       throw new Error("Gmail client not initialized");
 
     const message = await this._createMessage(sendArgs);
